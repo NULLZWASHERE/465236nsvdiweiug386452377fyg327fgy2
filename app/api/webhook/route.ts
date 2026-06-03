@@ -1,15 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getRedis, INBOX_TTL, MAX_EMAILS } from "@/lib/redis";
-
-export interface EmailMessage {
-  id: string;
-  from: string;
-  to: string;
-  subject: string;
-  text: string;
-  html?: string;
-  receivedAt: string;
-}
+import { readInbox, writeInbox } from "@/lib/storage";
+import type { StoredEmail } from "@/lib/storage";
 
 export async function POST(req: NextRequest) {
   const secret = req.headers.get("x-webhook-secret");
@@ -26,7 +17,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid recipient" }, { status: 400 });
   }
 
-  const msg: EmailMessage = {
+  const msg: StoredEmail = {
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     from: (body.from as string) ?? "unknown",
     to,
@@ -37,13 +28,10 @@ export async function POST(req: NextRequest) {
   };
 
   try {
-    const redis = getRedis();
-    const key = `inbox:${to}`;
-    await redis.lpush(key, JSON.stringify(msg));
-    await redis.ltrim(key, 0, MAX_EMAILS - 1);
-    await redis.expire(key, INBOX_TTL);
+    const existing = await readInbox(to);
+    await writeInbox(to, [msg, ...existing]);
   } catch (e) {
-    console.error("Redis error:", e);
+    console.error("KV write error:", e);
     return NextResponse.json({ error: "Storage error" }, { status: 500 });
   }
 
