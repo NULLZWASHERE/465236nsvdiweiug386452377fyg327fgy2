@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getRedis } from "@/lib/redis";
+import { readInbox } from "@/lib/storage";
 
 export async function GET(
   _req: NextRequest,
@@ -13,14 +13,13 @@ export async function GET(
   }
 
   try {
-    const redis = getRedis();
-    const raw = await redis.lrange(`inbox:${addr}`, 0, 49);
-    const emails = raw.map((m) => {
-      if (typeof m === "string") { try { return JSON.parse(m); } catch { return null; } }
-      return m;
-    }).filter(Boolean);
+    const emails = await readInbox(addr);
     return NextResponse.json({ emails });
-  } catch {
-    return NextResponse.json({ error: "Storage not configured.", emails: [] }, { status: 503 });
+  } catch (e) {
+    console.error(e);
+    return NextResponse.json(
+      { error: "Storage not configured. Add Cloudflare env vars.", emails: [] },
+      { status: 503 }
+    );
   }
 }
