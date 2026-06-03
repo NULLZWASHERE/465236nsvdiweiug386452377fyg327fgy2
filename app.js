@@ -46,7 +46,7 @@ form.addEventListener('submit', async (e) => {
   setLoading(true);
 
   try {
-    const res = await fetch('/api/index', {
+    const res = await fetch('/api/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ url, label }),
