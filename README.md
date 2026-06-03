@@ -1,120 +1,61 @@
-# zekoro.fun — Free Disposable Email
+# zekoro.fun — Free Disposable Email (Cloudflare Workers)
 
-Instant disposable email generator. No signup, no tracking, emails auto-delete after 24 hours.
+100% Cloudflare. No Vercel, no Upstash. Workers + KV + Email Routing.
 
-## Features
+## Deploy in 4 steps
 
-- **Instant email generation** — random `adj.noun.xxxx@zekoro.fun` addresses
-- **Auto-polling inbox** — checks every 8 seconds automatically
-- **Email reader** — view plain text or HTML emails
-- **Copy to clipboard** — one click
-- **Clear inbox** — delete all messages instantly
-- **Vercel serverless** — deploys for free, scales automatically
-
----
-
-## Deploy to Vercel
-
-### 1. Push to GitHub
-
+### 1. Install & login
 ```bash
-git init && git add . && git commit -m "init"
-git remote add origin https://github.com/YOU/zekoro-fun.git
-git push -u origin main
+npm install
+npx wrangler login
 ```
 
-### 2. Import on Vercel
+### 2. Create the KV namespace
+```bash
+npx wrangler kv namespace create EMAILS_KV
+```
+Copy the returned `id` into `wrangler.toml` (replace `YOUR_KV_NAMESPACE_ID` in both places).
 
-Go to [vercel.com/new](https://vercel.com/new) → import your repo.
-
-### 3. Add Upstash Redis (free)
-
-1. Go to [upstash.com](https://upstash.com) → create a free Redis database
-2. Copy **REST URL** and **REST Token**
-3. In Vercel project settings → **Environment Variables** add:
-
-| Variable | Value |
-|----------|-------|
-| `UPSTASH_REDIS_REST_URL` | `https://xxxx.upstash.io` |
-| `UPSTASH_REDIS_REST_TOKEN` | `AXxx...` |
-| `WEBHOOK_SECRET` | any random string you choose |
+### 3. Deploy the worker
+```bash
+npm run deploy
+```
+Your worker is live at `https://zekoro-fun.YOUR-SUBDOMAIN.workers.dev`
 
 ### 4. Point your domain
-
-In Vercel → **Domains** → add `zekoro.fun` and follow DNS instructions.
+In the Cloudflare dashboard → Workers & Pages → your worker → Settings → Domains & Routes
+→ Add `zekoro.fun/*`
 
 ---
 
-## Receive Real Emails
+## Set up email receiving
 
-You need to forward incoming mail to your webhook. Two easy options:
+In Cloudflare dashboard → **Email** → **Email Routing**:
+1. Enable Email Routing for `zekoro.fun`
+2. Go to **Routing Rules** → **Catch-all** → Action: **Send to a Worker** → select `zekoro-fun`
 
-### Option A — Cloudflare Email Routing (Free)
+That's it. Emails sent to `anything@zekoro.fun` will be stored in KV and appear in the inbox automatically.
 
-1. Add `zekoro.fun` to Cloudflare
-2. Go to **Email → Email Routing → Catch-all** → forward to a **Worker**
-3. Create a Worker that POSTs to `https://zekoro.fun/api/webhook`:
+---
 
-```js
-export default {
-  async email(message, env) {
-    const text = await new Response(message.raw).text();
-    await fetch("https://zekoro.fun/api/webhook", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-webhook-secret": env.WEBHOOK_SECRET,
-      },
-      body: JSON.stringify({
-        from: message.from,
-        to: message.to,
-        subject: message.headers.get("subject") ?? "",
-        text,
-      }),
-    });
-  },
-};
+## Local dev
+```bash
+npm run dev
+```
+Opens on `http://localhost:5000`. KV is simulated locally by wrangler.
+
+## Architecture
+
+```
+Email arrives at *@zekoro.fun
+      ↓
+Cloudflare Email Routing
+      ↓
+Worker email() handler → stores in KV (24h TTL)
+      ↓
+Browser polls /api/inbox/:email every 8s
+      ↓
+Worker reads from KV → returns JSON
 ```
 
-### Option B — Mailgun (Free tier)
-
-1. Add domain to Mailgun → set MX records
-2. Create an **Inbound Route** → forward to `https://zekoro.fun/api/webhook`
-3. Mailgun will POST parsed email JSON automatically
-
----
-
-## Webhook API
-
-`POST /api/webhook`
-
-```json
-{
-  "from": "sender@example.com",
-  "to": "swift.fox.ab3c@zekoro.fun",
-  "subject": "Hello there",
-  "text": "Plain text body",
-  "html": "<p>Optional HTML body</p>"
-}
-```
-
-Header: `x-webhook-secret: YOUR_WEBHOOK_SECRET`
-
-## Other API Endpoints
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/api/generate` | Generate a new random email |
-| `GET` | `/api/inbox/:email` | Fetch inbox messages |
-| `DELETE` | `/api/delete/:email` | Clear inbox |
-
----
-
-## Tech Stack
-
-- **Next.js 15** (App Router)
-- **Upstash Redis** — email storage (free tier, 10k req/day)
-- **Tailwind CSS** — styling
-- **Vercel** — serverless hosting
-
-Emails are stored for **24 hours** and capped at **50 per inbox**.
+Everything runs inside one Cloudflare Worker. Zero external dependencies.
