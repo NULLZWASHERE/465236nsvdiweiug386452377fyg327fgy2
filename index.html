@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>zekoro.fun — Webhook Proxy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <div class="noise"></div>
+  <div class="glow-top"></div>
+
+  <!-- Header -->
+  <header>
+    <a class="logo" href="/">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+        <path d="M10 1L18 5.5V14.5L10 19L2 14.5V5.5L10 1Z" stroke="url(#hg)" stroke-width="1.5"/>
+        <path d="M10 6L14 8.5V13.5L10 16L6 13.5V8.5L10 6Z" fill="url(#hg2)"/>
+        <defs>
+          <linearGradient id="hg" x1="2" y1="1" x2="18" y2="19" gradientUnits="userSpaceOnUse">
+            <stop stop-color="#c4b5fd"/><stop offset="1" stop-color="#818cf8"/>
+          </linearGradient>
+          <linearGradient id="hg2" x1="6" y1="6" x2="14" y2="16" gradientUnits="userSpaceOnUse">
+            <stop stop-color="#c4b5fd"/><stop offset="1" stop-color="#818cf8"/>
+          </linearGradient>
+        </defs>
+      </svg>
+      <span>zekoro<em>.fun</em></span>
+    </a>
+    <div class="status-pill">
+      <span class="status-dot"></span>All systems normal
+    </div>
+  </header>
+
+  <main>
+
+    <!-- Hero -->
+    <section class="hero">
+      <div class="hero-inner">
+        <div class="hero-text">
+          <div class="eyebrow-chip">
+            <svg width="10" height="10" viewBox="0 0 10 10"><circle cx="5" cy="5" r="4" stroke="#a78bfa" stroke-width="1.2"/><path d="M3.5 5l1.2 1.2L7 3.5" stroke="#a78bfa" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Free · No sign-up · Instant
+          </div>
+          <h1>Hide your webhook.<br/><span class="word-highlight">Nobody sees it.</span></h1>
+          <p>Get a public proxy URL that forwards to your real webhook — without exposing where it actually goes.</p>
+          <div class="hero-pills">
+            <span class="hpill">🔒 URL stays secret</span>
+            <span class="hpill">⚡ 30 req/min limit</span>
+            <span class="hpill">📡 All methods</span>
+          </div>
+        </div>
+        <div class="hero-visual">
+          <div class="hv-card">
+            <div class="hv-row hv-header">
+              <span class="hv-dot red"></span>
+              <span class="hv-dot yellow"></span>
+              <span class="hv-dot green"></span>
+              <span class="hv-title">proxy request</span>
+            </div>
+            <div class="hv-body">
+              <div class="hv-line">
+                <span class="hv-key">POST</span>
+                <span class="hv-val url-proxy">zekoro.fun/api/proxy/<em>a1b2c3d4</em></span>
+              </div>
+              <div class="hv-arrow">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 2v10M4 9l4 4 4-4" stroke="#6366f1" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span>forwarded internally</span>
+              </div>
+              <div class="hv-line hv-hidden-line">
+                <span class="hv-key">→</span>
+                <span class="hv-val url-real">
+                  <span class="blur-text">discord.com/api/webhooks/10938…</span>
+                  <span class="lock-badge">🔒 hidden</span>
+                </span>
+              </div>
+              <div class="hv-response">
+                <span class="hv-status ok">200 OK</span>
+                <span class="hv-resp-note">real URL never returned</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Form -->
+    <section class="form-section">
+      <div class="form-card" id="formCard">
+        <div class="form-card-label">Create a proxy</div>
+        <form id="registerForm">
+          <div class="inline-form">
+            <div class="inline-input-wrap">
+              <svg class="input-icon" width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1l5 3v6l-5 3L2 10V4l5-3Z" stroke="#6b7280" stroke-width="1.2"/></svg>
+              <input type="url" id="webhookUrl" placeholder="Paste your webhook URL here…" required autocomplete="off" spellcheck="false"/>
+            </div>
+            <div class="inline-input-wrap small-wrap">
+              <input type="text" id="label" placeholder="Label (optional)" maxlength="60"/>
+            </div>
+            <button type="submit" id="submitBtn">
+              <span id="btnText">Generate</span>
+              <span id="btnLoader" class="loader hidden"></span>
+            </button>
+          </div>
+          <div id="formError" class="form-error hidden"></div>
+        </form>
+      </div>
+    </section>
+
+    <!-- Result -->
+    <section id="resultSection" class="result-section hidden">
+      <div class="result-card">
+        <div class="result-badge">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><polyline points="2 7 5.5 10.5 12 4" stroke="#34d399" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Proxy active
+        </div>
+        <h3 id="resultLabel">Your proxy</h3>
+        <p class="result-caption">Share this URL — your real webhook stays hidden.</p>
+
+        <div class="url-display">
+          <input type="text" id="proxyUrlDisplay" readonly/>
+          <button class="copy-btn" id="copyBtn">
+            <svg class="icon-copy" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            Copy
+          </button>
+        </div>
+
+        <div class="result-meta">
+          <div class="meta-chip"><span>30 req/min</span></div>
+          <div class="meta-chip"><span>All HTTP methods</span></div>
+          <div class="meta-chip"><span>10s timeout</span></div>
+          <div class="meta-chip"><span>Headers forwarded</span></div>
+        </div>
+
+        <div class="result-footer">
+          <button class="txt-btn" id="viewStatsBtn">
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><rect x="1" y="7" width="3" height="5" rx=".5" fill="currentColor" opacity=".6"/><rect x="5" y="4.5" width="3" height="7.5" rx=".5" fill="currentColor" opacity=".8"/><rect x="9" y="1.5" width="3" height="10.5" rx=".5" fill="currentColor"/></svg>
+            Stats
+          </button>
+          <button class="txt-btn danger" id="deleteBtn">
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2 3h9M5 3V2h3v1M3 3l.5 8h6l.5-8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Delete proxy
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Stats -->
+    <section id="statsSection" class="stats-section hidden">
+      <div class="stats-card">
+        <div class="stats-header">
+          <span class="stats-title">Proxy stats</span>
+          <button class="txt-btn" id="refreshStatsBtn">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M10.5 6A4.5 4.5 0 1 1 8.2 2.1" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><path d="M8.2 2l2.3.1-.1 2.3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Refresh
+          </button>
+        </div>
+        <div class="stats-grid">
+          <div class="stat-block">
+            <div class="stat-num" id="statHits">0</div>
+            <div class="stat-lbl">Total hits</div>
+          </div>
+          <div class="stat-block err">
+            <div class="stat-num" id="statErrors">0</div>
+            <div class="stat-lbl">Errors</div>
+          </div>
+          <div class="stat-block wide">
+            <div class="stat-num sm" id="statLastHit">Never</div>
+            <div class="stat-lbl">Last request</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Divider -->
+    <div class="section-divider">
+      <span>How it works</span>
+    </div>
+
+    <!-- How it works -->
+    <section class="steps-section">
+      <div class="steps-grid">
+
+        <div class="step-card">
+          <div class="step-num">01</div>
+          <div class="step-icon s1">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M4 6h12M4 10h8M4 14h5" stroke="#a78bfa" stroke-width="1.5" stroke-linecap="round"/></svg>
+          </div>
+          <h4>Paste your webhook</h4>
+          <p>Enter any HTTP/HTTPS webhook URL. It's stored securely on the server — never returned in any response.</p>
+        </div>
+
+        <div class="step-connector">
+          <div class="connector-line"></div>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="url(#cg)" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><defs><linearGradient id="cg" x1="3" y1="8" x2="13" y2="8" gradientUnits="userSpaceOnUse"><stop stop-color="#a78bfa"/><stop offset="1" stop-color="#60a5fa"/></linearGradient></defs></svg>
+          <div class="connector-line"></div>
+        </div>
+
+        <div class="step-card">
+          <div class="step-num">02</div>
+          <div class="step-icon s2">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 2l6 3.5v9L10 18l-6-3.5v-9L10 2z" stroke="#60a5fa" stroke-width="1.5"/><path d="M10 8v4M10 8l-3-2M10 8l3-2" stroke="#60a5fa" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <h4>Get a proxy URL</h4>
+          <p>Instantly receive a <code>zekoro.fun/api/proxy/…</code> URL. Share this publicly — it points to us, not your real endpoint.</p>
+        </div>
+
+        <div class="step-connector">
+          <div class="connector-line"></div>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="url(#cg2)" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><defs><linearGradient id="cg2" x1="3" y1="8" x2="13" y2="8" gradientUnits="userSpaceOnUse"><stop stop-color="#60a5fa"/><stop offset="1" stop-color="#34d399"/></linearGradient></defs></svg>
+          <div class="connector-line"></div>
+        </div>
+
+        <div class="step-card">
+          <div class="step-num">03</div>
+          <div class="step-icon s3">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7" stroke="#34d399" stroke-width="1.5"/><path d="M7 10l2 2 4-4" stroke="#34d399" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <h4>We forward silently</h4>
+          <p>Requests are forwarded to your real webhook. The response body is dropped — callers only receive an HTTP status back.</p>
+        </div>
+
+      </div>
+
+      <div class="flow-vis">
+        <div class="fv-node">
+          <div class="fv-icon">👤</div>
+          <span>Caller</span>
+        </div>
+        <div class="fv-track">
+          <div class="fv-pulse"></div>
+          <div class="fv-label">POST /api/proxy/abc123</div>
+        </div>
+        <div class="fv-node fv-center">
+          <div class="fv-icon">🛡️</div>
+          <span>zekoro.fun</span>
+        </div>
+        <div class="fv-track">
+          <div class="fv-pulse delay"></div>
+          <div class="fv-label">Forwarded internally</div>
+        </div>
+        <div class="fv-node">
+          <div class="fv-icon">🎯</div>
+          <span>Your webhook</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Divider -->
+    <div class="section-divider">
+      <span>FAQ</span>
+    </div>
+
+    <!-- FAQ -->
+    <section class="faq-section">
+      <div class="faq-list" id="faqList">
+
+        <div class="faq-item">
+          <button class="faq-q" aria-expanded="false">
+            Is my real webhook URL visible to anyone?
+            <svg class="faq-chevron" width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 5l4 4 4-4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <div class="faq-a">
+            <p>No. Your URL is stored server-side only and is never returned in any API response. Even the response body from your webhook is discarded — callers only ever see an HTTP status code.</p>
+          </div>
+        </div>
+
+        <div class="faq-item">
+          <button class="faq-q" aria-expanded="false">
+            What does the rate limiting do?
+            <svg class="faq-chevron" width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 5l4 4 4-4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <div class="faq-a">
+            <p>Each source IP is limited to <strong>30 requests per minute per proxy</strong>. Requests over that get a <code>429</code> response and are never forwarded to your real webhook — protecting you from spam and flooding.</p>
+          </div>
+        </div>
+
+        <div class="faq-item">
+          <button class="faq-q" aria-expanded="false">
+            Does it work with Discord, GitHub, Slack?
+            <svg class="faq-chevron" width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 5l4 4 4-4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <div class="faq-a">
+            <p>Yes. Signature headers like <code>X-Hub-Signature-256</code>, <code>X-GitHub-Event</code>, and <code>X-Slack-Signature</code> are forwarded, so webhook verification on your end still works correctly.</p>
+          </div>
+        </div>
+
+        <div class="faq-item">
+          <button class="faq-q" aria-expanded="false">
+            What if my webhook is down or unreachable?
+            <svg class="faq-chevron" width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 5l4 4 4-4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <div class="faq-a">
+            <p>Requests timeout after <strong>10 seconds</strong>. If we can't reach your webhook the caller gets a <code>502 Bad Gateway</code>. We don't retry — the request is dropped.</p>
+          </div>
+        </div>
+
+        <div class="faq-item">
+          <button class="faq-q" aria-expanded="false">
+            How do I delete a proxy?
+            <svg class="faq-chevron" width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 5l4 4 4-4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <div class="faq-a">
+            <p>After creating a proxy, hit the <strong>Delete proxy</strong> button in the result card. It's permanent — future requests to that URL will return <code>404</code>.</p>
+          </div>
+        </div>
+
+        <div class="faq-item">
+          <button class="faq-q" aria-expanded="false">
+            Is this free? Any limits?
+            <svg class="faq-chevron" width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 5l4 4 4-4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <div class="faq-a">
+            <p>Completely free. Up to <strong>20 proxies per IP every 15 minutes</strong>, and each proxy handles 30 requests per minute per source IP. No account required.</p>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+
+  <footer>
+    <div class="footer-inner">
+      <span class="footer-brand">zekoro<em>.fun</em></span>
+      <span class="footer-copy">Your webhook URLs stay private.</span>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
