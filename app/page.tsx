@@ -13,19 +13,29 @@ interface Email {
 }
 
 const POLL_MS = 8000;
+const DOMAIN = "@zekoro.fun";
 
 export default function Page() {
-  const [address, setAddress]     = useState("");
-  const [emails, setEmails]       = useState<Email[]>([]);
-  const [loading, setLoading]     = useState(false);
-  const [genning, setGenning]     = useState(false);
-  const [copied, setCopied]       = useState(false);
-  const [selected, setSelected]   = useState<Email | null>(null);
-  const [htmlTab, setHtmlTab]     = useState(false);
-  const [checkedAt, setCheckedAt] = useState("");
-  const [noStorage, setNoStorage] = useState(false);
-  const addrRef  = useRef("");
-  const pollRef  = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [address, setAddress]       = useState("");
+  const [emails, setEmails]         = useState<Email[]>([]);
+  const [loading, setLoading]       = useState(false);
+  const [genning, setGenning]       = useState(false);
+  const [copied, setCopied]         = useState(false);
+  const [selected, setSelected]     = useState<Email | null>(null);
+  const [htmlTab, setHtmlTab]       = useState(false);
+  const [checkedAt, setCheckedAt]   = useState("");
+  const [noStorage, setNoStorage]   = useState(false);
+  const [customInput, setCustomInput] = useState("");
+  const [customErr, setCustomErr]   = useState("");
+  const [compose, setCompose]       = useState(false);
+  const [sendTo, setSendTo]         = useState("");
+  const [sendSubj, setSendSubj]     = useState("");
+  const [sendBody, setSendBody]     = useState("");
+  const [sending, setSending]       = useState(false);
+  const [sendStatus, setSendStatus] = useState<{ ok: boolean; msg: string } | null>(null);
+
+  const addrRef = useRef("");
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchInbox = useCallback(async (addr: string) => {
     if (!addr) return;
@@ -44,20 +54,33 @@ export default function Page() {
     pollRef.current = setInterval(() => fetchInbox(addr), POLL_MS);
   }, [fetchInbox]);
 
-  const generate = useCallback(async () => {
-    setGenning(true);
+  const activateAddress = useCallback((addr: string) => {
+    setAddress(addr);
+    addrRef.current = addr;
     setEmails([]);
     setSelected(null);
     setNoStorage(false);
+    startPoll(addr);
+    fetchInbox(addr);
+  }, [fetchInbox, startPoll]);
+
+  const generate = useCallback(async () => {
+    setGenning(true);
     try {
       const r = await fetch("/api/generate");
       const d = await r.json();
-      setAddress(d.email);
-      addrRef.current = d.email;
-      startPoll(d.email);
-      await fetchInbox(d.email);
+      activateAddress(d.email);
     } finally { setGenning(false); }
-  }, [fetchInbox, startPoll]);
+  }, [activateAddress]);
+
+  const useCustom = () => {
+    const raw = customInput.trim().toLowerCase().replace(/[^a-z0-9._-]/g, "");
+    if (!raw) { setCustomErr("Enter a username"); return; }
+    if (raw.length < 3) { setCustomErr("At least 3 characters"); return; }
+    setCustomErr("");
+    setCustomInput("");
+    activateAddress(`${raw}${DOMAIN}`);
+  };
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -78,7 +101,33 @@ export default function Page() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  useEffect(() => { generate(); return () => { if (pollRef.current) clearInterval(pollRef.current); }; }, []);
+  const sendEmail = async () => {
+    if (!sendTo || !sendSubj || !sendBody) return;
+    setSending(true);
+    setSendStatus(null);
+    try {
+      const r = await fetch("/api/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ from: address, to: sendTo, subject: sendSubj, text: sendBody }),
+      });
+      const d = await r.json();
+      if (r.ok) {
+        setSendStatus({ ok: true, msg: "Sent!" });
+        setSendTo(""); setSendSubj(""); setSendBody("");
+        setTimeout(() => { setCompose(false); setSendStatus(null); }, 1500);
+      } else {
+        setSendStatus({ ok: false, msg: d.error ?? "Failed to send" });
+      }
+    } catch {
+      setSendStatus({ ok: false, msg: "Network error" });
+    } finally { setSending(false); }
+  };
+
+  useEffect(() => {
+    generate();
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, []);
 
   const ago = (iso: string) => {
     const d = (Date.now() - new Date(iso).getTime()) / 1000;
@@ -133,10 +182,40 @@ export default function Page() {
               ? { background: "rgba(56,189,248,0.12)", border: "1px solid rgba(56,189,248,0.35)", color: "#38bdf8" }
               : { background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)", color: "#94a3b8" }}
           >
-            {copied
-              ? <><IconCheck /> Copied</>
-              : <><IconCopy /> Copy</>}
+            {copied ? <><IconCheck /> Copied</> : <><IconCopy /> Copy</>}
           </Btn>
+        </div>
+
+        {/* Custom address picker */}
+        <div style={{ marginTop: 12 }}>
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <div style={{
+              flex: 1, display: "flex", alignItems: "center",
+              border: `1px solid ${customErr ? "rgba(239,68,68,0.4)" : "rgba(255,255,255,0.08)"}`,
+              borderRadius: 10, overflow: "hidden",
+              background: "rgba(255,255,255,0.03)",
+            }}>
+              <input
+                value={customInput}
+                onChange={e => { setCustomInput(e.target.value); setCustomErr(""); }}
+                onKeyDown={e => { if (e.key === "Enter") useCustom(); }}
+                placeholder="pick your own username"
+                style={{
+                  flex: 1, background: "none", border: "none", outline: "none",
+                  padding: "9px 12px", fontSize: 13, color: "var(--text)",
+                  fontFamily: "'JetBrains Mono', monospace",
+                }}
+              />
+              <span style={{ padding: "0 12px 0 0", fontSize: 13, color: "#475569", whiteSpace: "nowrap" }}>
+                {DOMAIN}
+              </span>
+            </div>
+            <Btn onClick={useCustom} style={{
+              background: "rgba(167,139,250,0.1)", border: "1px solid rgba(167,139,250,0.25)",
+              color: "#a78bfa", flexShrink: 0,
+            }}>Use</Btn>
+          </div>
+          {customErr && <p style={{ fontSize: 12, color: "#f87171", marginTop: 5 }}>{customErr}</p>}
         </div>
 
         <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap", alignItems: "center" }}>
@@ -149,6 +228,11 @@ export default function Page() {
             background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "#94a3b8",
           }}>
             <IconRefresh spin={loading} /> Refresh
+          </Btn>
+          <Btn onClick={() => { setCompose(true); setSendStatus(null); }} disabled={!address} style={{
+            background: "rgba(56,189,248,0.08)", border: "1px solid rgba(56,189,248,0.2)", color: "#38bdf8",
+          }}>
+            <IconCompose /> Compose
           </Btn>
           {emails.length > 0 && (
             <Btn onClick={clearInbox} style={{
@@ -167,10 +251,71 @@ export default function Page() {
         )}
       </Card>
 
+      {/* ── Compose modal ───────────────────────────────────────── */}
+      {compose && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          zIndex: 100, padding: 16,
+        }} onClick={e => { if (e.target === e.currentTarget) setCompose(false); }}>
+          <div className="animate-fade-in" style={{
+            background: "var(--surface)", border: "1px solid var(--border)",
+            borderRadius: 18, padding: 24, width: "100%", maxWidth: 480,
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
+              <span style={{ fontWeight: 600, fontSize: 15, color: "var(--text)" }}>Compose email</span>
+              <button onClick={() => setCompose(false)} style={{
+                background: "none", border: "none", cursor: "pointer", color: "#64748b", fontSize: 18, lineHeight: 1,
+              }}>✕</button>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <ComposeField label="From" value={address} readOnly />
+              <ComposeField label="To" value={sendTo} onChange={setSendTo} placeholder="recipient@example.com" type="email" />
+              <ComposeField label="Subject" value={sendSubj} onChange={setSendSubj} placeholder="Subject" />
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 600, letterSpacing: ".08em", textTransform: "uppercase", color: "var(--muted)", display: "block", marginBottom: 6 }}>Message</label>
+                <textarea
+                  value={sendBody}
+                  onChange={e => setSendBody(e.target.value)}
+                  placeholder="Write your message…"
+                  rows={6}
+                  style={{
+                    width: "100%", resize: "vertical",
+                    background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)",
+                    borderRadius: 10, padding: "10px 12px", fontSize: 13, color: "var(--text)",
+                    outline: "none", fontFamily: "inherit",
+                  }}
+                />
+              </div>
+            </div>
+
+            {sendStatus && (
+              <div style={{
+                marginTop: 12, padding: "9px 12px", borderRadius: 8, fontSize: 13,
+                background: sendStatus.ok ? "rgba(34,197,94,0.1)" : "rgba(239,68,68,0.1)",
+                border: `1px solid ${sendStatus.ok ? "rgba(34,197,94,0.25)" : "rgba(239,68,68,0.25)"}`,
+                color: sendStatus.ok ? "#4ade80" : "#f87171",
+              }}>{sendStatus.msg}</div>
+            )}
+
+            <div style={{ display: "flex", gap: 8, marginTop: 16, justifyContent: "flex-end" }}>
+              <Btn onClick={() => setCompose(false)} style={{
+                background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "#94a3b8",
+              }}>Cancel</Btn>
+              <Btn onClick={sendEmail} disabled={sending || !sendTo || !sendSubj || !sendBody} style={{
+                background: "linear-gradient(135deg,#0ea5e9,#8b5cf6)", color: "#fff", fontWeight: 600,
+              }}>
+                {sending ? <><IconRefresh spin /> Sending…</> : <><IconSend /> Send</>}
+              </Btn>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Inbox / Reader ──────────────────────────────────────── */}
       <Card style={{ padding: 0, overflow: "hidden", minHeight: 320 }}>
         {selected ? (
-          /* ── Email reader ── */
           <div className="animate-fade-in" style={{ padding: 20 }}>
             <button onClick={() => { setSelected(null); setHtmlTab(false); }} style={{
               display: "inline-flex", alignItems: "center", gap: 5,
@@ -198,6 +343,21 @@ export default function Page() {
               ))}
             </div>
 
+            {/* Reply button */}
+            <div style={{ marginBottom: 14 }}>
+              <Btn onClick={() => {
+                setSendTo(selected.from);
+                setSendSubj(`Re: ${selected.subject}`);
+                setSendBody(`\n\n--- Original message ---\n${selected.text}`);
+                setSendStatus(null);
+                setCompose(true);
+              }} style={{
+                background: "rgba(56,189,248,0.08)", border: "1px solid rgba(56,189,248,0.2)", color: "#38bdf8",
+              }}>
+                <IconReply /> Reply
+              </Btn>
+            </div>
+
             {selected.html && (
               <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
                 {[["Plain text", false], ["HTML", true]].map(([label, isHtml]) => (
@@ -223,7 +383,6 @@ export default function Page() {
             }
           </div>
         ) : (
-          /* ── Inbox list ── */
           <>
             <div style={{
               display: "flex", alignItems: "center", justifyContent: "space-between",
@@ -252,7 +411,7 @@ export default function Page() {
                 icon={<IconWarn />}
                 color="#fbbf24"
                 title="Storage not configured"
-                sub={<>Add <code style={{ background:"rgba(255,255,255,0.06)", padding:"1px 5px", borderRadius:4 }}>UPSTASH_REDIS_REST_URL</code> and <code style={{ background:"rgba(255,255,255,0.06)", padding:"1px 5px", borderRadius:4 }}>UPSTASH_REDIS_REST_TOKEN</code> to your Vercel environment variables.</>}
+                sub={<>Connect an Upstash Redis database in your Vercel project → Storage tab.</>}
               />
             ) : emails.length === 0 ? (
               <EmptyState
@@ -297,8 +456,35 @@ export default function Page() {
   );
 }
 
-/* ── Small helpers ──────────────────────────────────────────────────── */
+/* ── Compose field helper ───────────────────────────────────────────── */
+function ComposeField({ label, value, onChange, placeholder, readOnly, type }: {
+  label: string; value: string; onChange?: (v: string) => void;
+  placeholder?: string; readOnly?: boolean; type?: string;
+}) {
+  return (
+    <div>
+      <label style={{ fontSize: 11, fontWeight: 600, letterSpacing: ".08em", textTransform: "uppercase", color: "var(--muted)", display: "block", marginBottom: 5 }}>{label}</label>
+      <input
+        type={type ?? "text"}
+        value={value}
+        onChange={e => onChange?.(e.target.value)}
+        placeholder={placeholder}
+        readOnly={readOnly}
+        style={{
+          width: "100%",
+          background: readOnly ? "rgba(255,255,255,0.02)" : "rgba(255,255,255,0.03)",
+          border: "1px solid rgba(255,255,255,0.08)",
+          borderRadius: 10, padding: "9px 12px", fontSize: 13,
+          color: readOnly ? "#64748b" : "var(--text)",
+          outline: "none", fontFamily: readOnly ? "'JetBrains Mono', monospace" : "inherit",
+          cursor: readOnly ? "default" : "text",
+        }}
+      />
+    </div>
+  );
+}
 
+/* ── Small helpers ──────────────────────────────────────────────────── */
 function Card({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
   return (
     <div style={{
@@ -374,4 +560,13 @@ function IconBack() {
 }
 function IconWarn() {
   return <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>;
+}
+function IconCompose() {
+  return <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>;
+}
+function IconSend() {
+  return <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>;
+}
+function IconReply() {
+  return <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>;
 }
